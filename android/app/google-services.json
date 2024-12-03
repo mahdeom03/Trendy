@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "209731300632",
+    "project_id": "trendy-673bd",
+    "storage_bucket": "trendy-673bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209731300632:android:1e77470effef6aa397426d",
+        "android_client_info": {
+          "package_name": "com.example.unichat_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwbbN_nTEMW9b6F8FLLEbrrqeCiI6VLTA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
