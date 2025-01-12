@@ -1,22 +1,36 @@
 import 'dart:developer';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+import 'package:sizer/sizer.dart';
+import 'package:unichat_app/provider/cartProvider.dart';
+import 'package:unichat_app/ui/pagrs/CartPage.dart';
+import 'package:unichat_app/ui/pagrs/Change%20password.dart';
+import 'package:unichat_app/ui/pagrs/CustomSearchDelegate.dart';
 import 'package:unichat_app/ui/pagrs/Loign.dart';
 import 'package:unichat_app/ui/pagrs/Mypro.dart';
-import 'package:unichat_app/ui/pagrs/profuctDetalis.dart';
+import 'package:unichat_app/ui/pagrs/ProductDetails.dart';
+import 'package:unichat_app/ui/pagrs/ContactPage.dart';
+import 'package:unichat_app/ui/pagrs/about.dart';
+import 'package:unichat_app/widget/LocationPage.dart';
+import 'package:unichat_app/widget/PromotionalBanner.dart';
+import '../../widget/Location_Service.dart';
 import 'SignUp.dart';
 import 'auth.dart';
-import 'SecondPage.dart';
 
 class Homepage extends StatefulWidget {
-  const Homepage({super.key});
+  Homepage({super.key});
 
   @override
   State<Homepage> createState() => _HomepageState();
 }
 
 class _HomepageState extends State<Homepage> {
+  String _location = "Location not determined yet"; // لتخزين الموقع الجغرافي
+  bool _isLoading = false; // لتحديد حالة التحميل
+  String city = 'Null';
   List<IconData> icons = [
     Icons.all_inbox,
     Icons.shop,
@@ -24,6 +38,24 @@ class _HomepageState extends State<Homepage> {
     Icons.shopping_bag,
     Icons.ice_skating,
   ];
+  void _getLocation() {
+    setState(() {
+      _isLoading = true;
+    });
+
+    LocationService.getLocation((location, city, country) {
+      print('Location: $location');
+      print('City: $city');
+      print('Country: $country');
+
+      setState(() {
+        _location = location;
+        LocationPage.cityName = city; // تحديث المدينة
+        LocationPage.countryName = country; // تحديث البلد
+        _isLoading = false;
+      });
+    });
+  }
 
   List<String> textOfIcons = ['All', 'T-shirt', 'Jeans', "Jackets", "Shoes"];
 
@@ -39,64 +71,66 @@ class _HomepageState extends State<Homepage> {
   List<Map<String, String>> filter = [];
 
   List<VoidCallback> functionsOfIcons = [];
-
-  @override
+  late CartProvider _cartProvider;
+  LocationPage location1 = LocationPage();
   void initState() {
+    super.initState();
+    // تحديث المدينة هنا بعد جلب الموقع
+    city = LocationPage.cityName; // تأكد من تعيين المدينة
     fetchProducts();
+    _getLocation();
+    print(city);
     functionsOfIcons = [
       () {
-        // filter = images.where((d) => d['type'] == 'Shirt').toList();
         fetchProducts();
         setState(() {});
       },
       () {
-        // filter = images.where((d) => d['type'] == 'Shirt').toList();
         fetchProducts(categorey: 'Shirt');
         setState(() {});
       },
       () {
-        // filter = images.where((d) => d['type'] == 'Jeans').toList();
         fetchProducts(categorey: 'Jeans');
         setState(() {});
       },
       () {
-        // filter = images.where((d) => d['type'] == 'Jackets').toList();
         fetchProducts(categorey: 'Jackets');
         setState(() {});
       },
       () {
-        // filter = images.where((d) => d['type'] == 'Shoes').toList();
         fetchProducts(categorey: 'Shoes');
         setState(() {});
       },
     ];
     filter = images;
-    super.initState();
+    _cartProvider = Provider.of<CartProvider>(context, listen: false);
+    _cartProvider.fetchCartProducts();
   }
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   CollectionReference products =
       FirebaseFirestore.instance.collection('products');
   List<QueryDocumentSnapshot>? productList = [];
-  Future<void> fetchProducts({String? categorey}) async {
+
+  Future<void> fetchProducts({String? categorey, String? searchQuery}) async {
     try {
-      // Query Firestore for products with category 'Shirt'
-      if (categorey != null) {
-        QuerySnapshot querySnapshot =
+      QuerySnapshot querySnapshot;
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        querySnapshot = await products
+            .where('title', isGreaterThanOrEqualTo: searchQuery)
+            .where('title', isLessThanOrEqualTo: searchQuery + '\uf8ff')
+            .get();
+      } else if (categorey != null) {
+        querySnapshot =
             await products.where('category', isEqualTo: categorey).get();
-        setState(() {
-          // Assign the list of documents to productsData
-          productList = querySnapshot.docs;
-          log('data is ${productList}');
-        });
       } else {
-        QuerySnapshot querySnapshot = await products.get();
-        setState(() {
-          // Assign the list of documents to productsData
-          productList = querySnapshot.docs;
-          log('data is ${productList}');
-        });
+        querySnapshot = await products.get();
       }
+
+      setState(() {
+        productList = querySnapshot.docs;
+      });
     } catch (e) {
       print('Error fetching products: $e');
     }
@@ -105,9 +139,225 @@ class _HomepageState extends State<Homepage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Scaffold(
+        child: Consumer<CartProvider>(builder: (context, value, child) {
+      return Scaffold(
+        floatingActionButton: FloatingActionButton(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(255)),
+          onPressed: () {
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (context) => Cartpage()))
+                .then((_) async => await value.fetchCartProducts());
+          },
+          backgroundColor: Color.fromARGB(255, 5, 60, 142),
+          elevation: 4.0,
+          tooltip: 'عرض سلة المشتريات',
+          child: Stack(
+            clipBehavior: Clip.none, // Allows the badge to overflow
+            children: [
+              Icon(
+                Icons.shopping_bag_outlined,
+                color: Colors.white,
+                size: 30.0,
+              ),
+              if (value.cartCount >
+                  0) // Only show the badge if there are items in the cart
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: EdgeInsets.all(4.0),
+                    decoration: BoxDecoration(
+                      color: Colors.red, // Badge color
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${value.cartCount}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         key: _scaffoldKey,
-        backgroundColor: const Color.fromARGB(255, 230, 230, 230),
+        backgroundColor: Colors.white,
+        drawer: Drawer(
+          backgroundColor: Colors.white,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              const DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Color.fromARGB(255, 1, 33, 80),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: AssetImage(
+                          'images/profile_image.jpg'), // ضع صورة الملف الشخصي هنا
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Trendy',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.home, color: Color.fromARGB(255, 1, 33, 80)),
+                title: const Text(
+                  'Home',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => Homepage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.account_circle,
+                    color: Color.fromARGB(255, 1, 33, 80)),
+                title: const Text(
+                  'My Profile',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MyPro()),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.settings, color: Color.fromARGB(255, 1, 33, 80)),
+                title: const Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => LocationPage()));
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.lock_outline, // أيقونة تغيير كلمة المرور
+                  color: Color.fromARGB(255, 1, 33, 80),
+                ),
+                title: const Text(
+                  'ChangePasswor',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ChangePasswordWidget(), // تأكد أن ChangePasswordWidget معرف بشكل صحيح
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.contact_mail, // تغيير أيقونة لتناسب "اتصل بنا"
+                  color: Color.fromARGB(255, 1, 33, 80),
+                ),
+                title: const Text(
+                  "contact us",
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80), // نفس اللون للعنوان
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500, // جعل الخط متوسط السماكة
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const ContactPage(), // التأكد من أن اسم الصفحة هو ContactPage
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.info_outline, // أيقونة مناسبة لـ "من نحن"
+                  color: Color.fromARGB(255, 1, 33, 80),
+                ),
+                title: const Text(
+                  "about us", // النص باللغة العربية
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AboutPage(), // صفحة من نحن
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.logout, color: Color.fromARGB(255, 1, 33, 80)),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 1, 33, 80),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            Loign()), // استبدال LoginPage إذا كان اسمك مختلف
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
         body: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: SingleChildScrollView(
@@ -144,35 +394,39 @@ class _HomepageState extends State<Homepage> {
                                 fontWeight: FontWeight.bold),
                           ),
                           Container(
-                            width: 40,
-                            height: 40,
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Color.fromARGB(255, 1, 33, 80),
                                 borderRadius: BorderRadius.circular(10)),
-                            child: Center(
-                              child: IconButton(
-                                  onPressed: () {},
-                                  icon: const Icon(
-                                    Icons.search,
-                                    color: Color.fromARGB(255, 1, 33, 80),
-                                  )),
+                            child: IconButton(
+                              icon: Icon(Icons.search_rounded,
+                                  color: Colors.white, size: 30),
+                              onPressed: () {
+                                showSearch(
+                                  context: context,
+                                  delegate: CustomSearchDelegate(
+                                      products: productList!),
+                                );
+                              },
                             ),
-                          )
+                          ),
                         ],
                       ),
                       const SizedBox(height: 7),
-                      const Row(
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              const Text(
                                 'Your location',
                                 style: TextStyle(color: Colors.white),
                               ),
-                              Text('Jordan, Amman',
-                                  style: TextStyle(color: Colors.white)),
+                              Text(
+                                  "Location: ${LocationPage.cityName}, ${LocationPage.countryName}",
+                                  style: const TextStyle(color: Colors.white)),
                             ],
                           ),
                         ],
@@ -181,6 +435,7 @@ class _HomepageState extends State<Homepage> {
                   ),
                 ),
                 const SizedBox(height: 15),
+
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -191,13 +446,6 @@ class _HomepageState extends State<Homepage> {
                           fontSize: 17,
                           fontWeight: FontWeight.bold),
                     ),
-                    Text(
-                      'See all',
-                      style: TextStyle(
-                          color: Color.fromARGB(255, 5, 60, 142),
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold),
-                    )
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -232,10 +480,12 @@ class _HomepageState extends State<Homepage> {
                       ),
                   ],
                 ),
+                const PromotionalBanner(), // إضافة البانر هنا
                 const SizedBox(height: 20),
+
                 Container(
                   height: MediaQuery.sizeOf(context).height,
-                  child: GridView(
+                  child: GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -244,108 +494,71 @@ class _HomepageState extends State<Homepage> {
                       crossAxisSpacing: 15.0,
                       mainAxisSpacing: 15.0,
                     ),
-                    children: [
-                      for (int i = 0; i < productList!.length; i++)
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ProductDetailPage(
-                                  products: productList![i],
+                    itemCount: productList!.length,
+                    itemBuilder: (context, i) {
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProductDetailPage(
+                                products: productList![i],
+                              ),
+                            ),
+                          ).then((_) => _cartProvider.fetchCartProducts());
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.shade300,
+                                blurRadius: 5,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              productList![i]['image_url'][0] != ''
+                                  ? Image.network(
+                                      productList![i]['image_url'][0],
+                                      width: 140,
+                                      height: 140,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Icon(Icons.image),
+                              const SizedBox(height: 10),
+                              Text(
+                                productList![i]['title']!,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            );
-                          },
-                          child: Container(
-                            child: Column(
-                              children: [
-                                productList![i]['image_url'][0] != ''
-                                    ? Image.network(
-                                        productList![i]['image_url'][0],
-                                        width: 140,
-                                        height: 140,
-                                      )
-                                    : Icon(Icons.image),
-                                const SizedBox(height: 10),
-                                Text(productList![i]['title']!),
-                                const SizedBox(height: 10),
-                                Text(
-                                  '${productList![i]['price']!} JOD',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                )
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: Colors.white,
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 1,
-                                    spreadRadius: 1,
-                                    offset: Offset(2, 3),
-                                  )
-                                ]),
+                              const SizedBox(height: 5),
+                              Text(
+                                '${productList![i]['price']} JOD',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                    ],
+                      );
+                    },
                   ),
-                ),
+                )
               ],
             ),
           ),
         ),
-        drawer: Drawer(
-          child: ListView(
-            children: <Widget>[
-              UserAccountsDrawerHeader(
-                accountName: Text("User Name"),
-                accountEmail: Text("user@example.com"),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 1, 33, 80),
-                ),
-                currentAccountPicture: CircleAvatar(
-                  backgroundImage:
-                      AssetImage("images/3.pug.jpg"), // صوره تاعت MY PRO//
-                ),
-              ),
-              ListTile(
-                leading: Icon(Icons.home),
-                title: Text('Home'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.account_circle),
-                title: Text("My Profile"),
-                onTap: () {
-                  Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (context) => MyPro()));
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.settings),
-                title: Text('Settings'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.logout),
-                title: Text('Logout'),
-                onTap: () {
-                  Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (context) => Loign()));
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      );
+    }));
   }
 }

@@ -7,9 +7,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.unichat_app"
+    namespace = "com.unichat_app.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = '25.1.8937393'
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.unichat_app"
+        applicationId = "com.unichat_app.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23

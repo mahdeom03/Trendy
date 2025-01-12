@@ -1,11 +1,8 @@
-import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import 'package:unichat_app/ui/pagrs/HomePage.dart';
 import 'package:unichat_app/ui/pagrs/Loign.dart';
-import 'package:unichat_app/utilites/sharedPref_helper.dart';
 
 class Signup extends StatefulWidget {
   const Signup({super.key});
@@ -15,51 +12,56 @@ class Signup extends StatefulWidget {
 }
 
 class _SignupState extends State<Signup> {
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   TextEditingController firstNameController = TextEditingController();
   TextEditingController lastNameController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   GlobalKey<FormState> FormStata = GlobalKey();
 
-  Future signUp() async {
+  Future<void> _createAccountWithEmailAndPassword(
+      String email, String password) async {
     try {
-      showDialog(
-          context: context,
-          builder: (context) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: Colors.green,
-              ),
-            );
-          });
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-              email: emailController.text, password: passwordController.text);
-      User? user = userCredential.user;
-      String? idToken = await user?.getIdToken();
-      print('token is ${idToken}');
-      await SharedPrefrenceHelper.setToken(token: idToken!);
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      print('User ID: ${userCredential.user!.uid}');
+
+      // Get user token
+      String? token = await userCredential.user!.getIdToken();
+      print("User Token: $token");
+
+      // Navigate to homepage after successful signup
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => Homepage()),
+      );
+
+      // Add user details to Firestore
       addUserDetails(
         firstName: firstNameController.text,
         lastName: lastNameController.text,
         email: emailController.text,
-      ).then((res) {
-        // print('response is ${res.id}');
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => const Homepage()));
-      });
-    } on FirebaseAuthException catch (e) {
-      Navigator.pop(context);
-      AwesomeDialog(
-        context: context,
-        dialogType: DialogType.error,
-        animType: AnimType.rightSlide,
-        title: 'Error',
-        desc: e.message,
-      ).show();
-      print('error is $e');
+        imageUrl: '', // Optional image URL
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: EdgeInsets.all(10),
+          duration: Duration(seconds: 5),
+        ),
+      );
     }
   }
 
@@ -67,6 +69,7 @@ class _SignupState extends State<Signup> {
     required String firstName,
     required String lastName,
     required String email,
+    required String imageUrl,
   }) async {
     return await FirebaseFirestore.instance
         .collection('users')
@@ -77,7 +80,7 @@ class _SignupState extends State<Signup> {
       'email': email,
       'role': 'cs',
       'id': FirebaseAuth.instance.currentUser?.uid,
-      'imageUrl': ''
+      'imageUrl': imageUrl,
     });
   }
 
@@ -87,37 +90,20 @@ class _SignupState extends State<Signup> {
       debugShowCheckedModeBanner: false,
       home: SafeArea(
         child: Scaffold(
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                        onPressed: () {}, icon: const Icon(Icons.translate))
-                  ],
-                ),
-              ],
-            ),
-          ),
           backgroundColor: Colors.white,
           body: Container(
             width: MediaQuery.of(context).size.width,
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            // margin: EdgeInsets.fromLTRB(9, 15, 29, 30),
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  const SizedBox(
-                    height: 20,
-                  ),
+                  const SizedBox(height: 20),
                   Container(
-                    width: MediaQuery.sizeOf(context).width,
+                    width: MediaQuery.of(context).size.width,
                     child: const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           "Create Your",
                           style: TextStyle(
                             color: Colors.black,
@@ -125,13 +111,11 @@ class _SignupState extends State<Signup> {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        SizedBox(
-                          height: 5,
-                        ),
-                        const Text(
+                        SizedBox(height: 5),
+                        Text(
                           "Account",
                           style: TextStyle(
-                            color: Colors.green,
+                            color: Color.fromARGB(255, 5, 60, 142),
                             fontSize: 40,
                             fontWeight: FontWeight.w500,
                           ),
@@ -139,177 +123,237 @@ class _SignupState extends State<Signup> {
                       ],
                     ),
                   ),
-                  const SizedBox(
-                    height: 20,
-                  ),
+                  const SizedBox(height: 20),
                   Form(
-                      key: FormStata,
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                  width: 165,
-                                  child: TextFormField(
-                                    validator: (value) {
-                                      if (value!.isEmpty) {
-                                        return ("الحقل فارغ");
-                                      }
-                                    },
-                                    controller: firstNameController,
-                                    decoration: const InputDecoration(
-                                        enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(25))),
-                                        labelText: "First Name",
-                                        border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(8))),
-                                        focusedBorder: OutlineInputBorder(
-                                            borderSide: BorderSide(
-                                                color: Colors.grey))),
-                                  )),
-                              // SizedBox(
-                              //   width: 4,
-                              // ),
-                              Container(
-                                  width: 165,
-                                  child: TextFormField(
-                                    validator: (value) {
-                                      if (value!.isEmpty) {
-                                        return "الحقل فارغ";
-                                      }
-                                    },
-                                    controller: lastNameController,
-                                    decoration: const InputDecoration(
-                                        enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(25))),
-                                        labelText: "Last Name",
-                                        border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(8))),
-                                        focusedBorder: OutlineInputBorder(
-                                            borderSide: BorderSide(
-                                                color: Colors.grey))),
-                                  )),
-                            ],
-                          ),
-                          const SizedBox(
-                            height: 20,
-                          ),
-                          Container(
-                              width: 350,
+                    key: FormStata,
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              width: 165,
                               child: TextFormField(
                                 validator: (value) {
                                   if (value!.isEmpty) {
                                     return "الحقل فارغ";
                                   }
                                 },
-                                controller: emailController,
+                                controller: firstNameController,
                                 decoration: const InputDecoration(
-                                    enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(25))),
-                                    labelText: "Email",
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(8))),
-                                    focusedBorder: OutlineInputBorder(
-                                        borderSide:
-                                            BorderSide(color: Colors.grey))),
-                              )),
-                          const SizedBox(
-                            height: 20,
-                          ),
-                          Container(
-                              width: 350,
-                              child: TextFormField(
-                                validator: (value) {
-                                  if (value!.isEmpty) {
-                                    return "الحقل فارغ";
-                                  }
-                                },
-                                controller: passwordController,
-                                decoration: const InputDecoration(
-                                    enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(25))),
-                                    labelText: "Password",
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(8))),
-                                    focusedBorder: OutlineInputBorder(
-                                        borderSide:
-                                            BorderSide(color: Colors.grey))),
-                              )),
-                          const SizedBox(
-                            height: 20,
-                          ),
-                          Container(
-                              width: 350,
-                              child: TextFormField(
-                                validator: (value) {
-                                  if (value!.isEmpty) {
-                                    return "الحقل فارغ";
-                                  }
-                                },
-                                controller: confirmPasswordController,
-                                decoration: const InputDecoration(
-                                    enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(25))),
-                                    labelText: "Confirm Password",
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(8))),
-                                    focusedBorder: OutlineInputBorder(
-                                        borderSide:
-                                            BorderSide(color: Colors.grey))),
-                              )),
-                          const SizedBox(
-                            height: 40,
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(20)),
-                            width: 300,
-                            child: MaterialButton(
-                              onPressed: () async {
-                                if (FormStata.currentState!.validate()) {
-                                  FormStata.currentState!.save();
-                                  // print(emailController.text);
-                                  // print(passwordController.text);
-                                  signUp();
-                                }
-                              },
-                              child: const Text('Sign up'),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(25)),
+                                  ),
+                                  labelText: "First Name",
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(8)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderSide: BorderSide(color: Colors.grey),
+                                  ),
+                                ),
+                              ),
                             ),
-                          )
-                        ],
-                      )),
-                  const SizedBox(
-                    height: 10,
+                            Container(
+                              width: 165,
+                              child: TextFormField(
+                                validator: (value) {
+                                  if (value!.isEmpty) {
+                                    return "الحقل فارغ";
+                                  }
+                                },
+                                controller: lastNameController,
+                                decoration: const InputDecoration(
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(25)),
+                                  ),
+                                  labelText: "Last Name",
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(8)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderSide: BorderSide(color: Colors.grey),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          width: 350,
+                          child: TextFormField(
+                            validator: (value) {
+                              if (value!.isEmpty) {
+                                return "الحقل فارغ";
+                              }
+                            },
+                            controller: emailController,
+                            decoration: const InputDecoration(
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(25)),
+                              ),
+                              labelText: "Email",
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          width: 350,
+                          child: TextFormField(
+                            validator: (value) {
+                              if (value!.isEmpty) {
+                                return "الحقل فارغ";
+                              }
+                              return null;
+                            },
+                            controller: passwordController,
+                            obscureText: !_isPasswordVisible,
+                            decoration: InputDecoration(
+                              enabledBorder: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(25)),
+                              ),
+                              labelText: "Password",
+                              border: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8)),
+                              ),
+                              focusedBorder: const OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isPasswordVisible = !_isPasswordVisible;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          width: 350,
+                          child: TextFormField(
+                            validator: (value) {
+                              if (value!.isEmpty) {
+                                return "الحقل فارغ";
+                              } else if (value != passwordController.text) {
+                                return "كلمة المرور غير متطابقة";
+                              }
+                              return null;
+                            },
+                            controller: confirmPasswordController,
+                            obscureText: !_isConfirmPasswordVisible,
+                            decoration: InputDecoration(
+                              enabledBorder: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(25)),
+                              ),
+                              labelText: "Confirm Password",
+                              border: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8)),
+                              ),
+                              focusedBorder: const OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isConfirmPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isConfirmPasswordVisible =
+                                        !_isConfirmPasswordVisible;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        Container(
+                          decoration: BoxDecoration(
+                              color: Color.fromARGB(255, 5, 60, 142),
+                              borderRadius: BorderRadius.circular(20)),
+                          width: 300,
+                          child: MaterialButton(
+                            onPressed: () async {
+                              if (FormStata.currentState!.validate()) {
+                                FormStata.currentState!.save();
+                                if (passwordController.text ==
+                                    confirmPasswordController.text) {
+                                  _createAccountWithEmailAndPassword(
+                                    emailController.text,
+                                    passwordController.text,
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Password and confirm password do not match'),
+                                      backgroundColor: Colors.red,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                      margin: EdgeInsets.all(10),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: const Text(
+                              'Sign up',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 10),
                   InkWell(
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => const Loign()));
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => Loign()));
                     },
                     child: RichText(
-                        text: const TextSpan(children: [
-                      TextSpan(
-                          text: 'Already have an account?  ',
-                          style: TextStyle(color: Colors.black)),
-                      TextSpan(
-                          text: 'login', style: TextStyle(color: Colors.green))
-                    ])),
+                      text: const TextSpan(children: [
+                        TextSpan(
+                            text: 'Already have an account?  ',
+                            style: TextStyle(color: Colors.black)),
+                        TextSpan(
+                            text: 'login',
+                            style: TextStyle(
+                                color: Color.fromARGB(255, 5, 60, 142))),
+                      ]),
+                    ),
                   ),
-                  SizedBox(
-                    height: 20,
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

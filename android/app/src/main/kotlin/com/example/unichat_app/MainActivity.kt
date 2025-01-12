@@ -1,4 +1,4 @@
-package com.example.unichat_app
+package com.unichat_app.app
 
 import io.flutter.embedding.android.FlutterActivity
 

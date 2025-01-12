@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:209731300632:android:1e77470effef6aa397426d",
+        "mobilesdk_app_id": "1:209731300632:android:3def00061d91648d97426d",
         "android_client_info": {
-          "package_name": "com.example.unichat_app"
+          "package_name": "com.unichat_app.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "209731300632-k932gpvun12gnkrs9tiu2teruuuc3adv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAwbbN_nTEMW9b6F8FLLEbrrqeCiI6VLTA"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "209731300632-k932gpvun12gnkrs9tiu2teruuuc3adv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
