@@ -1,8 +1,12 @@
 import 'dart:developer';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 import 'package:unichat_app/provider/cartProvider.dart';
@@ -31,13 +35,15 @@ class _HomepageState extends State<Homepage> {
   String _location = "Location not determined yet"; // لتخزين الموقع الجغرافي
   bool _isLoading = false; // لتحديد حالة التحميل
   String city = 'Null';
+
   List<IconData> icons = [
     Icons.all_inbox,
-    Icons.shop,
-    Icons.card_travel,
-    Icons.shopping_bag,
-    Icons.ice_skating,
+    FontAwesomeIcons.shirt,
+    FontAwesomeIcons.ruler,
+    Icons.checkroom,
+    FontAwesomeIcons.shoePrints,
   ];
+
   void _getLocation() {
     setState(() {
       _isLoading = true;
@@ -56,6 +62,8 @@ class _HomepageState extends State<Homepage> {
       });
     });
   }
+
+  String? imageUrl;
 
   List<String> textOfIcons = ['All', 'T-shirt', 'Jeans', "Jackets", "Shoes"];
 
@@ -79,6 +87,7 @@ class _HomepageState extends State<Homepage> {
     city = LocationPage.cityName; // تأكد من تعيين المدينة
     fetchProducts();
     _getLocation();
+    getUserData();
     print(city);
     functionsOfIcons = [
       () {
@@ -133,6 +142,26 @@ class _HomepageState extends State<Homepage> {
       });
     } catch (e) {
       print('Error fetching products: $e');
+    }
+  }
+
+  Future<void> getUserData() async {
+    try {
+      String? userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            imageUrl = userDoc['imageUrl'] ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error getting user data: $e');
     }
   }
 
@@ -191,8 +220,8 @@ class _HomepageState extends State<Homepage> {
           child: ListView(
             padding: EdgeInsets.zero,
             children: <Widget>[
-              const DrawerHeader(
-                decoration: BoxDecoration(
+              DrawerHeader(
+                decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 1, 33, 80),
                 ),
                 child: Row(
@@ -200,11 +229,14 @@ class _HomepageState extends State<Homepage> {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundImage: AssetImage(
-                          'images/profile_image.jpg'), // ضع صورة الملف الشخصي هنا
+                      backgroundImage: imageUrl != null && imageUrl!.isNotEmpty
+                          ? NetworkImage(
+                              imageUrl!) // استخدام رابط الصورة إذا كان موجودًا
+                          : AssetImage(
+                              'images/profile_image.jpg'), // الصورة الافتراضية في حال لم يوجد رابط
                     ),
-                    SizedBox(width: 10),
-                    Text(
+                    const SizedBox(width: 10),
+                    const Text(
                       'Trendy',
                       style: TextStyle(
                         color: Colors.white,
